@@ -1,10 +1,10 @@
 /*
- * Copyright 2016-2020, Cypress Semiconductor Corporation or a subsidiary of
- * Cypress Semiconductor Corporation. All Rights Reserved.
+ * Copyright 2016-2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
- * materials ("Software"), is owned by Cypress Semiconductor Corporation
- * or one of its subsidiaries ("Cypress") and is protected by and subject to
+ * materials ("Software") is owned by Cypress Semiconductor Corporation
+ * or one of its affiliates ("Cypress") and is protected by and subject to
  * worldwide patent protection (United States and foreign),
  * United States copyright laws and international treaty provisions.
  * Therefore, you may use this Software only as provided in the license
@@ -13,7 +13,7 @@
  * If no EULA applies, Cypress hereby grants you a personal, non-exclusive,
  * non-transferable license to copy, modify, and compile the Software
  * source code solely for use in connection with Cypress's
- * integrated circuit products. Any reproduction, modification, translation,
+ * integrated circuit products.  Any reproduction, modification, translation,
  * compilation, or representation of this Software except as specified
  * above is prohibited without the express written permission of Cypress.
  *
@@ -50,6 +50,9 @@
 #endif
 #if defined(CYW20721B2) || defined(CYW43012C0)
 #include "wiced_audio_manager.h"
+#endif
+#ifdef CYW20721B2
+#include "wiced_audio_sink.h"
 #endif
 
 #if defined(CYW20721B2) || defined(CYW43012C0)
@@ -356,6 +359,11 @@ wiced_result_t av_app_start (void)
     wiced_result_t result;
 
     WICED_BT_TRACE( "[%s] Application start\n\r", __FUNCTION__ );
+
+#ifdef CYW20721B2
+    /* enable the mechanism to increae CPU clock to 96 MHz for decoding packet */
+    wiced_audio_sink_decode_in_clk_96MHz_set(WICED_TRUE);
+#endif
 
     /* Register with the A2DP sink profile code */
     result = wiced_bt_a2dp_sink_init( &bt_audio_config,
