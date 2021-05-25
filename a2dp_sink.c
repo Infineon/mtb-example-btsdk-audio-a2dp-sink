@@ -289,7 +289,7 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
 
             if ( p_data->connect.result == WICED_SUCCESS)
             {
-                uint16_t settings = HCI_ENABLE_MASTER_SLAVE_SWITCH;// HCI_DISABLE_ALL_LM_MODES;
+                uint16_t settings = HCI_ENABLE_ROLE_SWITCH;// HCI_DISABLE_ALL_LM_MODES;
 
                 WICED_BT_TRACE( "[%s] connected to addr: <%B> Handle:%d\n\r", __FUNCTION__, p_data->connect.bd_addr, p_data->connect.handle );
 

@@ -78,9 +78,6 @@
 #include "wiced_bt_dev.h"
 
 #define HCI_TRACE_OVER_TRANSPORT          // if defined HCI traces are send over transport/WICED HCI interface
-#ifndef CYW43012C0
-#define AUDIO_MUTE_UNMUTE_ON_INTERRUPT    // if defined, the app will mute/unmute audio while streaming on button press
-#endif
 /*****************************************************************************
 **                      Constants
 *****************************************************************************/
@@ -185,6 +182,8 @@ APPLICATION_START()
 
     /* Configure Audio buffer */
     wiced_audio_buffer_initialize (a2dp_sink_audio_buf_config);
+
+    WICED_BT_TRACE( "Device Class: 0x%02x%02x%02x\n",a2dp_sink_cfg_settings.device_class[0],a2dp_sink_cfg_settings.device_class[1],a2dp_sink_cfg_settings.device_class[2]);
 }
 
 /*
@@ -237,7 +236,7 @@ void a2dp_sink_hci_trace_cback( wiced_bt_hci_trace_type_t type, uint16_t length,
 
 #endif
 
-#ifdef AUDIO_MUTE_UNMUTE_ON_INTERRUPT
+#if AUDIO_MUTE_UNMUTE_ON_INTERRUPT
 
 void a2dp_sink_interrrupt_handler(void *data, uint8_t port_pin )
 {
@@ -312,7 +311,7 @@ wiced_result_t a2dp_sink_management_callback( wiced_bt_management_evt_t event, w
             // to get the hci traces over the uart.
             wiced_bt_dev_register_hci_trace( a2dp_sink_hci_trace_cback );
 #endif
-#ifdef AUDIO_MUTE_UNMUTE_ON_INTERRUPT
+#if AUDIO_MUTE_UNMUTE_ON_INTERRUPT
 #ifdef CYW20706A2
             wiced_bt_app_hal_init();
 #endif
