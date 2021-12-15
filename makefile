@@ -50,7 +50,9 @@ SUPPORTED_TARGETS = \
   CYW9M2BASE-43012BT \
   CYW920721M2EVK-01 \
   CYW920721M2EVK-02 \
-  CYW943012BTEVK-01
+  CYW943012BTEVK-01 \
+  CYW955572BTEVK-01 \
+  CYW920721M2EVB-03
 
 #
 # Advanced Configuration
@@ -79,6 +81,7 @@ XIP?=xip
 TRANSPORT?=UART
 ENABLE_DEBUG?=0
 SWITCH_MUTE?=1
+AUDIO_SHIELD_20721M2EVB_03_INCLUDED?=0
 
 # wait for SWD attach
 ifeq ($(ENABLE_DEBUG),1)
@@ -112,13 +115,22 @@ COMPONENTS += a2dp_sink_profile
 # Chip-specific components
 COMPONENTS_20721B2 += audiomanager
 
+ifeq ($(TARGET),CYW920721M2EVB-03)
+AUDIO_SHIELD_20721M2EVB_03_INCLUDED=1
+endif
+
+ifeq ($(AUDIO_SHIELD_20721M2EVB_03_INCLUDED),1)
+DISABLE_COMPONENTS += bsp_design_modus
+COMPONENTS += bsp_design_modus_shield
+endif
+
 ifeq ($(OTA_FW_UPGRADE),1)
 CY_APP_DEFINES += -DOTA_FW_UPGRADE=1
 COMPONENTS += fw_upgrade_lib
 endif
 
-# Mute/Unmute with CLI for platform except for 43012C0
-ifeq ($(filter $(TARGET),CYW9M2BASE-43012BT CYW943012BTEVK-01),)
+# Mute/Unmute with CLI for platform except for 43012C0, 55572A1
+ifeq ($(filter $(TARGET),CYW9M2BASE-43012BT CYW943012BTEVK-01 CYW955572BTEVK-01),)
 ifeq ($(SWITCH_MUTE),0)
 CY_APP_DEFINES += -DAUDIO_MUTE_UNMUTE_ON_INTERRUPT=0
 else
@@ -132,12 +144,6 @@ COMPONENTS += cyw9bt_audio2
 COMPONENTS += codec_cs47l35_lib
 endif # TARGET
 
-ifeq ($(TARGET),CYW920721B2EVK-03)
-CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
-COMPONENTS += cyw9bt_audio2
-COMPONENTS += codec_cs47l35_lib
-endif # TARGET
-
 ifeq ($(TARGET),CYW920721M2EVK-01)
 CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
 CY_APP_DEFINES += -DPLATFORM_LED_DISABLED
@@ -145,7 +151,7 @@ COMPONENTS += cyw9bt_audio2
 COMPONENTS += codec_cs47l35_lib
 endif
 
-ifeq ($(TARGET),CYW920721M2EVK-02)
+ifneq ($(filter $(TARGET),CYW920721M2EVK-02 CYW920721M2EVB-03),)
 CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
 CY_APP_DEFINES += -DPLATFORM_LED_DISABLED
 COMPONENTS += cyw9bt_audio2
@@ -162,10 +168,24 @@ endif # TARGET
 
 ifeq ($(TARGET),CYW943012BTEVK-01)
 CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
-CY_APP_DEFINES += -DNO_PUART_SUPPORT=1
 COMPONENTS += cyw9bt_audio2
 COMPONENTS += codec_cs47l35_lib
 COMPONENTS += audiomanager
+endif # TARGET
+
+
+ifeq ($(TARGET),CYW955572BTEVK-01)
+# Application Configuration
+CY_APP_DEFINES += -DAPP_CFG_ENABLE_BR_AUDIO=1
+CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
+COMPONENTS += cyw9bt_audio2
+COMPONENTS += codec_cs47l35_lib
+COMPONENTS += audiomanager
+
+# Apply new Audio Profiles
+DISABLE_COMPONENTS += a2dp_sink_profile
+COMPONENTS += a2dp_sink_profile_btstack
+COMPONENTS += audio_sink_route_config_lib
 endif # TARGET
 
 ################################################################################

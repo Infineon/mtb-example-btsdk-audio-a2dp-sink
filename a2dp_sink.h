@@ -65,7 +65,6 @@ typedef enum
 #define A2DP_SINK_SDP_DB_SIZE 81
 #endif
 
-extern void wiced_bt_trace_array( const char *string, const uint8_t* array, const uint16_t len );
 extern void av_app_init( void );
 extern void a2dp_sink_mute_unmute_audio( void );
 

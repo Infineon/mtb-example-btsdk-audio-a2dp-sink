@@ -48,14 +48,17 @@
 #else
 #include "hcidefs.h"
 #endif
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
 #include "wiced_audio_manager.h"
 #endif
 #ifdef CYW20721B2
 #include "wiced_audio_sink.h"
 #endif
+#if BTSTACK_VER >= 0x03000001
+#include "wiced_audio_sink_route_config.h"
+#endif
 
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
 int32_t a2dp_stream_id = WICED_AUDIO_MANAGER_STREAM_ID_INVALID;
 #endif
 
@@ -69,7 +72,7 @@ typedef struct
     AV_STATE                  state;               /* AVDT State machine state */
     AV_STREAM_STATE           audio_stream_state;  /* Audio Streaming to host state */
     wiced_bt_a2dp_codec_info_t codec_config;       /* Codec configuration information */
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
     audio_config_t              audio_config;   /* Audio Configuration */
 #endif
 } tAV_APP_CB;
@@ -190,9 +193,19 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
                 route_config.route = AUDIO_ROUTE_I2S;
                 route_config.is_master = WICED_TRUE;
             }
-            wiced_bt_a2dp_sink_update_route_config( p_data->codec_config.handle, &route_config);
 
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if BTSTACK_VER >= 0x03000001
+            wiced_audio_sink_route_config_set(
+                    route_config.route,
+                    &p_data->codec_config.codec,
+                    p_data->codec_config.handle,
+                    p_data->codec_config.cp_type,
+                    route_config.is_master);
+#else
+            wiced_bt_a2dp_sink_update_route_config( p_data->codec_config.handle, &route_config);
+#endif
+
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
             if (a2dp_stream_id == WICED_AUDIO_MANAGER_STREAM_ID_INVALID)
             {
                 a2dp_stream_id = wiced_am_stream_open(A2DP_PLAYBACK);
@@ -324,7 +337,13 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
                 WICED_BT_TRACE(" a2dp sink streaming started \n");
             }
 
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
+#if BTSTACK_VER >= 0x03000001
+            if (WICED_SUCCESS != wiced_audio_sink_route_config_stream_start(p_data->start_ind.handle))
+            {
+                WICED_BT_TRACE("wiced_audio_sink_route_config_stream_start failed\n");
+            }
+#endif
             if (WICED_SUCCESS != wiced_am_stream_start(a2dp_stream_id))
             {
                 WICED_BT_TRACE("wiced_am_stream_start failed\n");
@@ -336,12 +355,34 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
         case WICED_BT_A2DP_SINK_START_CFM_EVT:        /**< Start stream event, received when audio streaming is about to start */
             /* Maintain State */
             av_app_cb.state = AV_STATE_STARTED;
+
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
+#if BTSTACK_VER >= 0x03000001
+            if (WICED_SUCCESS != wiced_audio_sink_route_config_stream_start(p_data->start_ind.handle))
+            {
+                WICED_BT_TRACE("wiced_audio_sink_route_config_stream_start failed\n");
+            }
+#endif
+            if (WICED_SUCCESS != wiced_am_stream_start(a2dp_stream_id))
+            {
+                WICED_BT_TRACE("wiced_am_stream_start failed\n");
+            }
+#endif
+
             WICED_BT_TRACE(" a2dp sink streaming started handle:%d\n", p_data->start_cfm.handle);
             break;
 
         case WICED_BT_A2DP_SINK_SUSPEND_EVT:      /**< Suspend stream event, received when audio streaming is suspended */
             /* Maintain State */
             av_app_cb.state = AV_STATE_CONNECTED;
+
+#if BTSTACK_VER >= 0x03000001
+            if (WICED_SUCCESS != wiced_audio_sink_route_config_stream_stop(p_data->start_ind.handle))
+            {
+                WICED_BT_TRACE("wiced_audio_sink_route_config_stream_stop failed\n");
+            }
+#endif
+
             WICED_BT_TRACE(" a2dp sink streaming suspended \n");
             break;
 
@@ -368,6 +409,20 @@ wiced_result_t av_app_start (void)
     /* Register with the A2DP sink profile code */
     result = wiced_bt_a2dp_sink_init( &bt_audio_config,
                                       a2dp_sink_control_cback );
+
+#if BTSTACK_VER >= 0x03000001
+    /* initialize audio sink route config */
+    result = wiced_audio_sink_route_config_init(
+            &bt_audio_config.p_param,
+            &bt_audio_config.ext_codec);
+    if (result != WICED_SUCCESS)
+    {
+        WICED_BT_TRACE("Error: wiced_audio_sink_route_config_init fail (%d)\n",
+                result);
+        return result;
+    }
+#endif
+
     return result;
 }
 

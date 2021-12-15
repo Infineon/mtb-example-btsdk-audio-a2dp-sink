@@ -58,9 +58,6 @@
 #ifdef CYW20706A2
 #include "wiced_power_save.h"
 #endif
-#ifndef CYW43012C0
-#include "wiced_hal_mia.h"
-#endif
 #include "wiced_bt_a2dp_sink.h"
 #include "wiced_bt_trace.h"
 #include "a2dp_sink.h"
@@ -72,7 +69,7 @@
 #if ( defined(CYW20706A2) || defined(CYW20719B1) || defined(CYW20719B0) || defined(CYW20721B1) || defined(CYW20735B0) || defined(CYW43012C0) )
 #include "wiced_bt_app_hal_common.h"
 #endif
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
 #include "wiced_audio_manager.h"
 #endif
 #include "wiced_bt_dev.h"
@@ -113,20 +110,36 @@ const wiced_transport_cfg_t  transport_cfg =
             .baud_rate =  HCI_UART_DEFAULT_BAUD
         },
     },
+#if BTSTACK_VER >= 0x03000001
+    .heap_config =
+    {
+        .data_heap_size = 1024 * 4 + 1500 * 2,
+        .hci_trace_heap_size = 1024 * 2,
+        .debug_trace_heap_size = 1024,
+    },
+#else
     .rx_buff_pool_cfg =
     {
         .buffer_size = 0,
         .buffer_count = 0
     },
+#endif
     .p_status_handler = NULL,
     .p_data_handler = NULL,
     .p_tx_complete_cback = NULL
 };
 #endif
 
+#if BTSTACK_VER >= 0x03000001
+#define BT_STACK_HEAP_SIZE          1024 * 7
+wiced_bt_heap_t *p_default_heap = NULL;
+#endif
+
 extern const uint8_t                    a2dp_sink_sdp_db[A2DP_SINK_SDP_DB_SIZE];
 extern const wiced_bt_cfg_settings_t    a2dp_sink_cfg_settings;
+#ifndef BTSTACK_VER
 extern const wiced_bt_cfg_buf_pool_t    a2dp_sink_cfg_buf_pools[];
+#endif
 extern const wiced_bt_audio_config_buffer_t a2dp_sink_audio_buf_config;
 
 /******************************************************
@@ -177,13 +190,41 @@ APPLICATION_START()
 
     WICED_BT_TRACE( "A2DP SINK APP START\n" );
 
+#ifdef CYW20721B2
+    /* Disable secure connection because connection will drop when connecting with Win10 first time */
+    wiced_bt_dev_lrac_disable_secure_connection();
+#endif
+
+#if BTSTACK_VER >= 0x03000001
+    /* Create default heap */
+    p_default_heap = wiced_bt_create_heap("default_heap", NULL, BT_STACK_HEAP_SIZE, NULL,
+            WICED_TRUE);
+    if (p_default_heap == NULL)
+    {
+        WICED_BT_TRACE("create default heap error: size %d\n", BT_STACK_HEAP_SIZE);
+        return;
+    }
+#endif
+
+#if BTSTACK_VER >= 0x03000001
+    /* Register the dynamic configurations */
+    wiced_bt_stack_init( a2dp_sink_management_callback , &a2dp_sink_cfg_settings);
+#else
     /* Register the dynamic configurations */
     wiced_bt_stack_init( a2dp_sink_management_callback , &a2dp_sink_cfg_settings, a2dp_sink_cfg_buf_pools);
+#endif
 
     /* Configure Audio buffer */
     wiced_audio_buffer_initialize (a2dp_sink_audio_buf_config);
 
+#if BTSTACK_VER >= 0x03000001
+    WICED_BT_TRACE ("Device Class: 0x%02x%02x%02x\n",
+            a2dp_sink_cfg_settings.p_br_cfg->device_class[0],
+            a2dp_sink_cfg_settings.p_br_cfg->device_class[1],
+            a2dp_sink_cfg_settings.p_br_cfg->device_class[2]);
+#else
     WICED_BT_TRACE( "Device Class: 0x%02x%02x%02x\n",a2dp_sink_cfg_settings.device_class[0],a2dp_sink_cfg_settings.device_class[1],a2dp_sink_cfg_settings.device_class[2]);
+#endif
 }
 
 /*
@@ -218,7 +259,7 @@ void a2dp_sink_write_eir( void )
     *p++ = 0;
 
     // print EIR data
-    wiced_bt_trace_array( "EIR :", ( uint8_t* )( pBuf+1 ), MIN( p-( uint8_t* )pBuf,100 ) );
+    WICED_BT_TRACE_ARRAY( ( uint8_t* )( pBuf+1 ), MIN( p-( uint8_t* )pBuf,100 ), "EIR :" );
     wiced_bt_dev_write_eir( pBuf, (uint16_t)(p - pBuf) );
 
     return;
@@ -230,8 +271,13 @@ void a2dp_sink_write_eir( void )
  */
 void a2dp_sink_hci_trace_cback( wiced_bt_hci_trace_type_t type, uint16_t length, uint8_t* p_data )
 {
+#if BTSTACK_VER >= 0x03000001
+    //send the trace
+    wiced_transport_send_hci_trace( type, p_data, length  );
+#else
     //send the trace
     wiced_transport_send_hci_trace( NULL, type, length, p_data  );
+#endif
 }
 
 #endif
@@ -285,6 +331,9 @@ wiced_result_t a2dp_sink_management_callback( wiced_bt_management_evt_t event, w
     wiced_bt_dev_pairing_cplt_t        *p_pairing_cmpl;
     int                                 pairing_result;
     const uint8_t *link_key;
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
+    int32_t stream_id;
+#endif
 
     WICED_BT_TRACE( "a2dp_sink_management_callback 0x%02x\n", event );
 
@@ -328,8 +377,25 @@ wiced_result_t a2dp_sink_management_callback( wiced_bt_management_evt_t event, w
             wiced_bt_coex_enable();
 #endif
 #endif
-#if defined(CYW20721B2) || defined(CYW43012C0)
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
             wiced_am_init();
+            //Open external codec first to prevent DSP download delay later
+            stream_id = wiced_am_stream_open(A2DP_PLAYBACK);
+            if (stream_id == WICED_AUDIO_MANAGER_STREAM_ID_INVALID)
+            {
+                WICED_BT_TRACE("wiced_am_stream_open failed\n");
+            }
+            else
+            {
+                if (wiced_am_stream_close(stream_id) != WICED_SUCCESS)
+                {
+                    WICED_BT_TRACE("Err: wiced_am_stream_close\n");
+                }
+                else
+                {
+                    WICED_BT_TRACE("Init external codec done\n");
+                }
+            }
 #endif
             break;
 
