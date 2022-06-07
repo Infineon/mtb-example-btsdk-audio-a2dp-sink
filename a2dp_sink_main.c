@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -75,6 +75,13 @@
 #include "wiced_bt_dev.h"
 
 #define HCI_TRACE_OVER_TRANSPORT          // if defined HCI traces are send over transport/WICED HCI interface
+
+#ifdef HCI_TRACE_OVER_TRANSPORT
+#include "hci_control_api.h"
+static void hci_control_transport_status( wiced_transport_type_t type );
+static uint32_t hci_control_proc_rx_cmd( uint8_t *p_data, uint32_t length );
+#endif
+
 /*****************************************************************************
 **                      Constants
 *****************************************************************************/
@@ -124,9 +131,16 @@ const wiced_transport_cfg_t  transport_cfg =
         .buffer_count = 0
     },
 #endif
+
+#ifdef HCI_TRACE_OVER_TRANSPORT
+    .p_status_handler = hci_control_transport_status,
+    .p_data_handler = hci_control_proc_rx_cmd,
+    .p_tx_complete_cback = NULL
+#else
     .p_status_handler = NULL,
     .p_data_handler = NULL,
     .p_tx_complete_cback = NULL
+#endif
 };
 #endif
 
@@ -190,7 +204,7 @@ APPLICATION_START()
 
     WICED_BT_TRACE( "A2DP SINK APP START\n" );
 
-#ifdef CYW20721B2
+#if defined(CYW20721B2) || defined(CYW43012C0)
     /* Disable secure connection because connection will drop when connecting with Win10 first time */
     wiced_bt_dev_lrac_disable_secure_connection();
 #endif
@@ -280,6 +294,103 @@ void a2dp_sink_hci_trace_cback( wiced_bt_hci_trace_type_t type, uint16_t length,
 #endif
 }
 
+/*
+ * handle command from UART to configure traces
+ */
+void hci_control_handle_trace_enable( uint8_t *p_data )
+{
+    uint8_t hci_trace_enable = *p_data++;
+    wiced_debug_uart_types_t route_debug = (wiced_debug_uart_types_t)*p_data;
+
+    if ( hci_trace_enable )
+    {
+        /* Register callback for receiving hci traces */
+        wiced_bt_dev_register_hci_trace( a2dp_sink_hci_trace_cback );
+    }
+    else
+    {
+        wiced_bt_dev_register_hci_trace( NULL);
+    }
+    wiced_set_debug_uart( route_debug );
+}
+
+void hci_control_device_handle_command( uint16_t cmd_opcode, uint8_t* p_data, uint32_t data_len )
+{
+    uint8_t bytes_written;
+    switch( cmd_opcode )
+    {
+    case HCI_CONTROL_COMMAND_TRACE_ENABLE:
+        hci_control_handle_trace_enable( p_data );
+        break;
+
+    default:
+        WICED_BT_TRACE( "??? Unknown command code\n" );
+        break;
+    }
+    UNUSED_VARIABLE(bytes_written);
+}
+
+static uint32_t hci_control_proc_rx_cmd( uint8_t *p_data, uint32_t length )
+{
+    uint16_t opcode;
+    uint16_t payload_len;
+    uint8_t status = HCI_CONTROL_STATUS_SUCCESS;
+    uint8_t* p_rx_buf = p_data;
+
+    WICED_BT_TRACE( "hci_control_proc_rx_cmd:%d\n", length );
+
+    if ( !p_rx_buf )
+    {
+        return HCI_CONTROL_STATUS_INVALID_ARGS;
+    }
+    //Expected minimum 4 byte as the wiced header
+    if( length < 4 )
+    {
+        WICED_BT_TRACE("invalid params\n");
+#ifndef BTSTACK_VER
+        wiced_transport_free_buffer( p_rx_buf );
+#endif
+        return HCI_CONTROL_STATUS_INVALID_ARGS;
+    }
+
+
+    STREAM_TO_UINT16(opcode, p_data);     // Get opcode
+    STREAM_TO_UINT16(payload_len, p_data); // Get len
+
+    WICED_BT_TRACE("cmd_opcode 0x%02x\n", opcode);
+
+    switch((opcode >> 8) & 0xff)
+    {
+    case HCI_CONTROL_GROUP_DEVICE:
+        hci_control_device_handle_command( opcode, p_data, payload_len );
+        break;
+
+    default:
+        WICED_BT_TRACE( "unknown class code\n");
+        break;
+    }
+
+#ifndef BTSTACK_VER
+    //Freeing the buffer in which data is received
+    wiced_transport_free_buffer( p_rx_buf );
+#endif
+    return status;
+}
+
+void hci_control_send_device_started_evt( void )
+{
+    wiced_transport_send_data( HCI_CONTROL_EVENT_DEVICE_STARTED, NULL, 0 );
+}
+
+static void hci_control_transport_status( wiced_transport_type_t type )
+{
+    WICED_BT_TRACE( " hci_control_transport_status %x \n", type );
+    hci_control_send_device_started_evt();
+#ifdef SWITCH_PTU_CHECK
+    platform_transport_started = 1;
+#endif
+}
+
 #endif
 
 #if AUDIO_MUTE_UNMUTE_ON_INTERRUPT
@@ -356,10 +467,6 @@ wiced_result_t a2dp_sink_management_callback( wiced_bt_management_evt_t event, w
             wiced_bt_dev_set_discoverability( BTM_GENERAL_DISCOVERABLE, BTM_DEFAULT_DISC_WINDOW, BTM_DEFAULT_DISC_INTERVAL );
             wiced_bt_dev_set_connectability(  WICED_TRUE, BTM_DEFAULT_CONN_WINDOW, BTM_DEFAULT_CONN_INTERVAL );
 
-#ifdef HCI_TRACE_OVER_TRANSPORT
-            // to get the hci traces over the uart.
-            wiced_bt_dev_register_hci_trace( a2dp_sink_hci_trace_cback );
-#endif
 #if AUDIO_MUTE_UNMUTE_ON_INTERRUPT
 #ifdef CYW20706A2
             wiced_bt_app_hal_init();

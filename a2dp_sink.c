@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2021, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2022, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -214,6 +214,7 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
 
             if(p_data->codec_config.codec.codec_id == WICED_BT_A2DP_CODEC_SBC)
             {
+                WICED_BT_TRACE("Codec: SBC\n");
                 switch(p_data->codec_config.codec.cie.sbc.samp_freq)
                 {
                     case A2D_SBC_IE_SAMP_FREQ_16:
@@ -237,6 +238,7 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
             }
             else if(p_data->codec_config.codec.codec_id == WICED_BT_A2DP_CODEC_M24)
             {
+                WICED_BT_TRACE("Codec: M24\n");
                 switch(p_data->codec_config.codec.cie.m24.samp_freq)
                 {
                     case A2D_M24_IE_SAMP_FREQ_8:
@@ -376,13 +378,18 @@ static void a2dp_sink_control_cback( wiced_bt_a2dp_sink_event_t event,
             /* Maintain State */
             av_app_cb.state = AV_STATE_CONNECTED;
 
+#if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
 #if BTSTACK_VER >= 0x03000001
-            if (WICED_SUCCESS != wiced_audio_sink_route_config_stream_stop(p_data->start_ind.handle))
+            if (WICED_SUCCESS != wiced_audio_sink_route_config_stream_stop(p_data->suspend.handle))
             {
                 WICED_BT_TRACE("wiced_audio_sink_route_config_stream_stop failed\n");
             }
 #endif
-
+            if (WICED_SUCCESS != wiced_am_stream_stop(a2dp_stream_id))
+            {
+                WICED_BT_TRACE("wiced_am_stream_stop failed\n");
+            }
+#endif
             WICED_BT_TRACE(" a2dp sink streaming suspended \n");
             break;
 

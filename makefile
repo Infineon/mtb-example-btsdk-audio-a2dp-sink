@@ -1,5 +1,5 @@
 #
-# Copyright 2016-2021, Cypress Semiconductor Corporation (an Infineon company) or
+# Copyright 2016-2022, Cypress Semiconductor Corporation (an Infineon company) or
 # an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 #
 # This software, including source code, documentation and related
@@ -42,10 +42,9 @@ CONFIG=Debug
 VERBOSE=
 
 # default target
-TARGET=CYW920721B2EVK-02
+TARGET=CYW920721M2EVK-02
 
 SUPPORTED_TARGETS = \
-  CYW920721B2EVK-02 \
   CYW920706WCDEVAL \
   CYW9M2BASE-43012BT \
   CYW920721M2EVK-01 \
@@ -82,6 +81,7 @@ TRANSPORT?=UART
 ENABLE_DEBUG?=0
 SWITCH_MUTE?=1
 AUDIO_SHIELD_20721M2EVB_03_INCLUDED?=0
+AAC_SUPPORT ?= 0
 
 # wait for SWD attach
 ifeq ($(ENABLE_DEBUG),1)
@@ -91,7 +91,6 @@ endif
 CY_APP_DEFINES+=\
   -DWICED_BT_TRACE_ENABLE \
   -DA2DP_SINK_ENABLE_CONTENT_PROTECTION \
-  -DWICED_A2DP_EXT_CODEC=0
 
 # Chip-specific patch libs
 CY_20706A2_APP_PATCH_LIBS += wiced_audio_sink.a
@@ -138,12 +137,6 @@ CY_APP_DEFINES += -DAUDIO_MUTE_UNMUTE_ON_INTERRUPT=1
 endif
 endif
 
-ifeq ($(TARGET),CYW920721B2EVK-02)
-CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
-COMPONENTS += cyw9bt_audio2
-COMPONENTS += codec_cs47l35_lib
-endif # TARGET
-
 ifeq ($(TARGET),CYW920721M2EVK-01)
 CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
 CY_APP_DEFINES += -DPLATFORM_LED_DISABLED
@@ -181,12 +174,23 @@ CY_APP_DEFINES += -DCS47L35_CODEC_ENABLE
 COMPONENTS += cyw9bt_audio2
 COMPONENTS += codec_cs47l35_lib
 COMPONENTS += audiomanager
+AAC_SUPPORT := 1
 
 # Apply new Audio Profiles
 DISABLE_COMPONENTS += a2dp_sink_profile
 COMPONENTS += a2dp_sink_profile_btstack
 COMPONENTS += audio_sink_route_config_lib
 endif # TARGET
+
+ifeq ($(AAC_SUPPORT), 1)
+ifneq ($(TARGET),CYW955572BTEVK-01)
+CY_APP_PATCH_LIBS += ia_aaclc_lib.a
+endif
+CY_APP_DEFINES += -DA2DP_SINK_AAC_ENABLED
+CY_APP_DEFINES += -DWICED_A2DP_EXT_CODEC=1
+else
+CY_APP_DEFINES += -DWICED_A2DP_EXT_CODEC=0
+endif
 
 ################################################################################
 # Paths
