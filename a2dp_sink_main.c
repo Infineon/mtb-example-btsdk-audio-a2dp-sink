@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2022, Cypress Semiconductor Corporation (an Infineon company) or
+ * Copyright 2016-2023, Cypress Semiconductor Corporation (an Infineon company) or
  * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
  *
  * This software, including source code, documentation and related
@@ -66,7 +66,7 @@
 #include "string.h"
 #include "wiced_bt_stack.h"
 #include "wiced_memory.h"
-#if ( defined(CYW20706A2) || defined(CYW20719B1) || defined(CYW20719B0) || defined(CYW20721B1) || defined(CYW20735B0) || defined(CYW43012C0) )
+#if ( defined(CYW20706A2) || defined(CYW20719B1) || defined(CYW20719B0) || defined(CYW20721B1) || defined(CYW43012C0) )
 #include "wiced_bt_app_hal_common.h"
 #endif
 #if defined(CYW20721B2) || defined(CYW43012C0) || defined(CYW55572A1)
@@ -190,9 +190,9 @@ APPLICATION_START()
 #endif // CYW43012C0
 #else
     wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_PUART );
-#if ( defined(CYW20706A2) || defined(CYW20735B0) || defined(CYW20719B0))
+#if ( defined(CYW20706A2) )
     wiced_hal_puart_select_uart_pads( WICED_PUART_RXD, WICED_PUART_TXD, 0, 0);
-#endif /* defined(CYW20706A2) || defined(CYW20735B0) || defined(CYW20719B0) */
+#endif /* defined(CYW20706A2) */
 #endif /* NO_PUART_SUPPORT */
     // Set to HCI to see traces on HCI uart - default if no call to wiced_set_debug_uart()
     // wiced_set_debug_uart( WICED_ROUTE_DEBUG_TO_HCI_UART );
